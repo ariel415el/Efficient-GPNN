@@ -8,10 +8,17 @@ def get_NN_indices(X, Y, alpha, b=128):
     Returns a n2 n1 of indices
     """
     dist = compute_distances_batch(X, Y, b=b)
+    # dist = compute_distances(X, Y)
     # dist = torch.cdist(X.view(len(X), -1), Y.view(len(Y), -1)) # Not enough memory
     dist = (dist / (torch.min(dist, dim=0)[0] + alpha))  # compute_normalized_scores
     NNs = torch.argmin(dist, dim=1)  # find_NNs
     return NNs
+
+def compute_distances(X, Y):
+    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=X.dtype, device=X.device)
+    for i in range(len(X)):
+        dist_mat[i] = torch.mean((X[i] - Y) ** 2, dim=-1)
+    return dist_mat
 
 
 def efficient_compute_distances(X, Y):
@@ -32,7 +39,7 @@ def compute_distances_batch(X, Y, b):
     """
     """"""
     b = min(b, len(X))
-    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float32, device=X.device)
+    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=X.dtype, device=X.device)
     n_batches = len(X) // b
     for i in range(n_batches):
         dist_mat[i * b:(i + 1) * b] = efficient_compute_distances(X[i * b:(i + 1) * b], Y)
@@ -72,7 +79,7 @@ def get_col_mins_efficient(X, Y, b):
     :param Y:  (n2, d) tensor
     Returns n1 long array of L2 distances
     """
-    mins = torch.zeros(Y.shape[0], dtype=torch.float32, device=X.device)
+    mins = torch.zeros(Y.shape[0], dtype=X.dtype, device=X.device)
     n_batches = len(X) // b
     for i in range(n_batches):
         mins[i * b:(i + 1) * b] = efficient_compute_distances(X, Y[i * b:(i + 1) * b]).min(0)[0]

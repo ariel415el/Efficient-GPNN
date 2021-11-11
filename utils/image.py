@@ -9,7 +9,7 @@ import torchvision.utils
 
 def save_image(img, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    torchvision.utils.save_image(torch.clip(img, -1, 1), path, normalize=True)
+    torchvision.utils.save_image(torch.clip(img, 0, 1), path, normalize=True)
 
 
 def cv2pt(img):
