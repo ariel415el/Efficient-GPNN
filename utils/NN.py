@@ -10,7 +10,7 @@ def get_NN_indices(X, Y, alpha, b=128):
     dist = compute_distances_batch(X, Y, b=b)
     # dist = compute_distances(X, Y)
     # dist = torch.cdist(X.view(len(X), -1), Y.view(len(Y), -1)) # Not enough memory
-    dist = (dist / (torch.min(dist, dim=0)[0] + alpha))  # compute_normalized_scores
+    dist = (dist / (torch.min(dist, dim=0)[0] + alpha)) # compute_normalized_scores
     NNs = torch.argmin(dist, dim=1)  # find_NNs
     return NNs
 
@@ -24,8 +24,14 @@ def compute_distances(X, Y):
 def efficient_compute_distances(X, Y):
     """
     Pytorch efficient way of computing distances between all vectors in X and Y, i.e (X[:, None] - Y[None, :])**2
+    Get the nearest neighbor index from Y for each X
+    :param X:  (n1, d) tensor
+    :param Y:  (n2, d) tensor
+    Returns a n2 n1 of indices
     """
     dist = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * torch.mm(X, torch.transpose(Y, 0, 1))
+    d = X.shape[1]
+    dist /= d # normalize by size of vector to make dists independent of the size of d ( use same alpha for all patche-sizes)
     return dist
 
 

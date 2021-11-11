@@ -8,7 +8,7 @@ if __name__ == '__main__':
     image_paths = [os.path.join(dataset_dir, x) for x in os.listdir(dataset_dir)]
     PNN_moduel = PNN(patch_size=7,
                      stride=1,
-                     alpha=0.5,
+                     alpha=0.005,
                      reduce_memory_footprint=True)
     GPNN_module = GPNN(PNN_moduel,
                        scale_factor=(1, 1),
