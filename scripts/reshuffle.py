@@ -1,10 +1,12 @@
 import os
 from time import time
-from GPNN import PNN, GPNN
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from gpnn import PNN, GPNN
 from utils.image import save_image
 
 if __name__ == '__main__':
-    dataset_dir = '../images/SIGD16'
+    dataset_dir = 'images/SIGD16'
     image_paths = [os.path.join(dataset_dir, x) for x in os.listdir(dataset_dir)]
     PNN_moduel = PNN(patch_size=7,
                      stride=1,
