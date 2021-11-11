@@ -2,7 +2,7 @@ import os
 from time import time
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from gpnn import PNN, GPNN
+from GPNN import PNN, GPNN
 from utils.image import save_image
 
 if __name__ == '__main__':
