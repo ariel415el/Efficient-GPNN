@@ -9,13 +9,13 @@ import torchvision.utils
 
 def save_image(img, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    torchvision.utils.save_image(torch.clip(img, 0, 1), path, normalize=True)
+    torchvision.utils.save_image(torch.clip(img, -1, 1), path, normalize=True)
 
 
 def cv2pt(img):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = img / 255.
-    # img = img * 2 - 1
+    img = img * 2 - 1
     img = torch.from_numpy(img.transpose(2, 0, 1)).float()
 
     return img

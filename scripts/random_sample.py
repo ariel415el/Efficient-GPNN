@@ -20,7 +20,7 @@ if __name__ == '__main__':
                        device="cuda:0")
 
     out_dir = f"outputs/reshuffle"
-    for im_path in image_paths[:1]:
+    for im_path in image_paths:
         fname, ext = os.path.splitext(os.path.basename(im_path))[:2]
         for i in range(5):
             start = time()

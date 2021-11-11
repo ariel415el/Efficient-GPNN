@@ -4,6 +4,7 @@ from typing import Tuple
 import cv2
 import torch
 from torchvision import transforms
+from utils.image import save_image
 
 from utils.NN import get_NN_indices_low_memory, get_NN_indices
 
@@ -133,7 +134,7 @@ class GPNN:
 
         return initial_iamge.to(self.device)
 
-    def run(self, target_img_path, init_mode):
+    def run(self, target_img_path, init_mode, debug_dir=None):
         """
         Run the GPNN model to generate an image with a similar patch distribution to target_img_path.
         This manages the coarse to fine NN steps.
@@ -148,13 +149,16 @@ class GPNN:
                 h, w = self._get_synthesis_size(lvl=lvl)
                 self.synthesized_image = transforms.Resize((h, w), antialias=True)(self.synthesized_image)
 
-            from utils.image import save_image
-            save_image(self.synthesized_image, f"a/input{lvl}.png")
-            save_image(self.target_pyramid[lvl], f"a/target{lvl}.png")
-            self.synthesized_image = self.PNN_module.replace_patches(values_image=self.target_pyramid[lvl],
+
+            lvl_output = self.PNN_module.replace_patches(values_image=self.target_pyramid[lvl],
                                                          queries_image=self.synthesized_image,
                                                          n_steps=self.num_steps if lvl > 0 else 1,
                                                          keys_blur_factor=self.pyr_factor if lvl > 0 else 1)
-            save_image(self.synthesized_image, f"a/output{lvl}.png")
+            if debug_dir:
+                save_image(self.synthesized_image, f"{debug_dir}/input{lvl}.png")
+                save_image(self.target_pyramid[lvl], f"{debug_dir}/target{lvl}.png")
+                save_image(lvl_output, f"{debug_dir}/output{lvl}.png")
+
+            self.synthesized_image = lvl_output
 
         return self.synthesized_image
