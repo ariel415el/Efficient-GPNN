@@ -5,7 +5,7 @@ import cv2
 import torch
 from torchvision import transforms
 
-from utils.NN import get_patch_NNS_low_memory, get_patch_NNS
+from utils.NN import get_NN_indices_low_memory, get_NN_indices
 
 sys.path.append('.')
 from utils.image import aspect_ratio_resize, get_pyramid, cv2pt, match_image_sizes, blur, extract_patches, \
@@ -48,9 +48,9 @@ class PNN:
             queries = extract_patches(queries_image, self.patch_size, self.stride)
 
             if self.reduce_memory_footprint:
-                NNs = get_patch_NNS_low_memory(queries, keys, self.alpha)
+                NNs = get_NN_indices_low_memory(queries, keys, self.alpha)
             else:
-                NNs = get_patch_NNS(queries, keys, self.alpha)
+                NNs = get_NN_indices(queries, keys, self.alpha)
 
             queries_image = combine_patches(values[NNs], self.patch_size, self.stride, queries_image.shape)
 
@@ -148,9 +148,13 @@ class GPNN:
                 h, w = self._get_synthesis_size(lvl=lvl)
                 self.synthesized_image = transforms.Resize((h, w), antialias=True)(self.synthesized_image)
 
+            from utils.image import save_image
+            save_image(self.synthesized_image, f"a/input{lvl}.png")
+            save_image(self.target_pyramid[lvl], f"a/target{lvl}.png")
             self.synthesized_image = self.PNN_module.replace_patches(values_image=self.target_pyramid[lvl],
                                                          queries_image=self.synthesized_image,
                                                          n_steps=self.num_steps if lvl > 0 else 1,
                                                          keys_blur_factor=self.pyr_factor if lvl > 0 else 1)
+            save_image(self.synthesized_image, f"a/output{lvl}.png")
 
         return self.synthesized_image
