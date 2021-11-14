@@ -4,6 +4,8 @@ from typing import Tuple
 import cv2
 import torch
 from torchvision import transforms
+from tqdm import tqdm
+
 from utils.image import save_image
 
 from utils.NN import get_NN_indices_low_memory, get_NN_indices
@@ -12,6 +14,31 @@ sys.path.append('.')
 from utils.image import aspect_ratio_resize, get_pyramid, cv2pt, match_image_sizes, blur, extract_patches, \
     combine_patches
 
+class logger:
+    """Keeps track of the levels and steps of optimization. Logs it via TQDM"""
+    def __init__(self, n_steps, n_lvls):
+        self.n_steps = n_steps
+        self.n_lvls = n_lvls
+        self.lvl = -1
+        self.lvl_step = 0
+        self.steps = 0
+        self.pbar = tqdm(total=self.n_lvls * self.n_steps, desc='Starting')
+
+    def step(self):
+        self.pbar.update(1)
+        self.steps += 1
+        self.lvl_step += 1
+
+    def new_lvl(self):
+        self.lvl += 1
+        self.lvl_step = 0
+
+    def print(self):
+        # pass
+        self.pbar.set_description(f'Lvl {self.lvl}/{self.n_lvls}, step {self.lvl_step}/{self.n_steps}')
+
+    def close(self):
+        self.pbar.close()
 
 class PNN:
     """Patch nearest neighbor module. Replaces the patches of an initial guess by their nearest neighbor from a target image"""
@@ -36,7 +63,7 @@ class PNN:
         self.reduce_memory_footprint = reduce_memory_footprint
         self.batch_size = batch_size
 
-    def replace_patches(self, values_image, queries_image, n_steps, keys_blur_factor=1):
+    def replace_patches(self, values_image, queries_image, n_steps, keys_blur_factor=1, logger=None):
         """
         Repeats n_steps iterations of repalcing the patches in "queries_image" by thier nearest neighbors from "values_image".
         The NN matrix is calculated with "keys" wich are a possibly blurred version of the patches from "values_image"
@@ -57,6 +84,9 @@ class PNN:
                 NNs = get_NN_indices(queries, keys, self.alpha, b=self.batch_size)
 
             queries_image = combine_patches(values[NNs], self.patch_size, self.stride, queries_image.shape)
+            if logger:
+                logger.step()
+                logger.print()
 
         return queries_image
 
@@ -146,8 +176,10 @@ class GPNN:
         """
         self.target_pyramid = self._process_target_image(cv2.imread(target_img_path))
         self.synthesized_image = self._get_initial_image(init_mode)
+        self.logger = logger(self.num_steps, len(self.target_pyramid))
 
         for lvl, lvl_target_img in enumerate(self.target_pyramid):
+            self.logger.new_lvl()
             if lvl > 0:
                 h, w = self._get_synthesis_size(lvl=lvl)
                 self.synthesized_image = transforms.Resize((h, w), antialias=True)(self.synthesized_image)
@@ -156,7 +188,8 @@ class GPNN:
             lvl_output = self.PNN_module.replace_patches(values_image=self.target_pyramid[lvl],
                                                          queries_image=self.synthesized_image,
                                                          n_steps=self.num_steps if lvl > 0 else 1,
-                                                         keys_blur_factor=self.pyr_factor if lvl > 0 else 1)
+                                                         keys_blur_factor=self.pyr_factor if lvl > 0 else 1,
+                                                         logger=self.logger)
             if debug_dir:
                 save_image(self.synthesized_image, f"{debug_dir}/input{lvl}.png")
                 save_image(self.target_pyramid[lvl], f"{debug_dir}/target{lvl}.png")
@@ -164,4 +197,5 @@ class GPNN:
 
             self.synthesized_image = lvl_output
 
+        self.logger.close()
         return self.synthesized_image
