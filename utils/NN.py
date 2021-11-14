@@ -15,7 +15,7 @@ def get_NN_indices(X, Y, alpha, b=128):
     return NNs
 
 def compute_distances(X, Y):
-    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=X.dtype, device=X.device)
+    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
     for i in range(len(X)):
         dist_mat[i] = torch.mean((X[i] - Y) ** 2, dim=-1)
     return dist_mat
@@ -45,7 +45,7 @@ def compute_distances_batch(X, Y, b):
     """
     """"""
     b = min(b, len(X))
-    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=X.dtype, device=X.device)
+    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
     n_batches = len(X) // b
     for i in range(n_batches):
         dist_mat[i * b:(i + 1) * b] = efficient_compute_distances(X[i * b:(i + 1) * b], Y)
