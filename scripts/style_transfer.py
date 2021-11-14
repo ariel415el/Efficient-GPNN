@@ -13,6 +13,7 @@ contents_and_styles = [
     ('images/style_transfer/S_char.jpg', 'images/style_transfer/duck_mosaic.jpg'),
     ('images/style_transfer/kanyon2.jpg', 'images/style_transfer/tower.jpg'),
     ('images/style_transfer/tower.jpg', 'images/style_transfer/kanyon2.jpg'),
+    ('images/style_transfer/trump.jpg', 'images/style_transfer/mondrian.jpg'),
 ]
 
 
@@ -23,8 +24,8 @@ if __name__ == '__main__':
 
     out_dir = f"outputs/style_transfer"
     for (content_image_path, style_iamge_path) in contents_and_styles:
-        style_fname, ext = os.path.splitext(os.path.basename(content_image_path))[:2]
-        content_fname, _ = os.path.splitext(os.path.basename(style_iamge_path))[:2]
+        content_fname, ext = os.path.splitext(os.path.basename(content_image_path))[:2]
+        style_fname, _ = os.path.splitext(os.path.basename(style_iamge_path))[:2]
         for i in range(1):
             start = time()
             output_image = GPNN_module.run(target_img_path=style_iamge_path, init_mode=content_image_path)
