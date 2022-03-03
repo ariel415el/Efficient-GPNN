@@ -77,6 +77,24 @@ def get_NN_indices_low_memory(X, Y, alpha, b=512):
         NNs[n_batches * b:] = dists.min(1)[1]
     return NNs
 
+def get_NN_indices_faiss(X, Y):
+    import faiss
+    import numpy as np
+    X = np.ascontiguousarray(X.cpu().numpy(), dtype='float32')
+    Y = np.ascontiguousarray(Y.cpu().numpy(), dtype='float32')
+
+    index_flat = faiss.IndexFlatL2(Y.shape[-1])
+
+    # index_flat = faiss.index_cpu_to_gpu(faiss.StandardGpuResources(), 0, index_flat)
+    index_flat = faiss.index_cpu_to_all_gpus(index_flat)
+
+    index_flat.add(Y)  # add vectors to the index
+
+    _, I = index_flat.search(X, 1)  # actual search
+    NNs = I[:, 0]
+
+    return NNs
+
 
 def get_col_mins_efficient(X, Y, b):
     """

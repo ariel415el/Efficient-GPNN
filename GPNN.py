@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from utils.image import save_image
 
-from utils.NN import get_NN_indices_low_memory, get_NN_indices
+from utils.NN import get_NN_indices_low_memory, get_NN_indices, get_NN_indices_faiss
 
 sys.path.append('.')
 from utils.image import aspect_ratio_resize, get_pyramid, cv2pt, match_image_sizes, blur, extract_patches, \
@@ -47,6 +47,7 @@ class PNN:
                  stride: int = 1,
                  alpha: float = 0.005,
                  reduce_memory_footprint: bool = True,
+                 use_faiss=False,
                  batch_size: int = 512,
                  ):
         """
@@ -61,6 +62,7 @@ class PNN:
         self.stride = stride
         self.alpha = alpha
         self.reduce_memory_footprint = reduce_memory_footprint
+        self.use_faiss = use_faiss
         self.batch_size = batch_size
 
     def replace_patches(self, values_image, queries_image, n_steps, keys_blur_factor=1, logger=None):
@@ -78,7 +80,10 @@ class PNN:
         for i in range(n_steps):
             queries = extract_patches(queries_image, self.patch_size, self.stride)
 
-            if self.reduce_memory_footprint:
+            if self.use_faiss:
+                NNs = get_NN_indices_faiss(queries, keys)
+
+            elif self.reduce_memory_footprint:
                 NNs = get_NN_indices_low_memory(queries, keys, self.alpha, b=self.batch_size)
             else:
                 NNs = get_NN_indices(queries, keys, self.alpha, b=self.batch_size)
