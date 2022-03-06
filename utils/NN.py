@@ -1,4 +1,26 @@
+import faiss
+import numpy as np
 import torch
+
+
+def get_NN_indices_faiss(X, Y):
+    X = np.ascontiguousarray(X.cpu().numpy(), dtype='float32')
+    Y = np.ascontiguousarray(Y.cpu().numpy(), dtype='float32')
+    dim = Y.shape[-1]
+
+    index = faiss.IndexIVFFlat(faiss.IndexFlat(dim), dim, 50)
+    index.nprobe = 1
+    index.train(Y)
+
+    # index = faiss.index_cpu_to_all_gpus(index)
+    # index = faiss.index_cpu_to_gpu(faiss.StandardGpuResources(), 0, index)
+    # index.add(Y)  # add vectors to the index
+
+    _, I = index.search(X, 1)  # actual search
+    NNs = I[:, 0]
+
+    return NNs
+
 
 def get_NN_indices(X, Y, alpha, b=128):
     """
@@ -13,6 +35,7 @@ def get_NN_indices(X, Y, alpha, b=128):
     dist = (dist / (torch.min(dist, dim=0)[0] + alpha)) # compute_normalized_scores
     NNs = torch.argmin(dist, dim=1)  # find_NNs
     return NNs
+
 
 def compute_distances(X, Y):
     dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
@@ -77,24 +100,6 @@ def get_NN_indices_low_memory(X, Y, alpha, b=512):
         NNs[n_batches * b:] = dists.min(1)[1]
     return NNs
 
-def get_NN_indices_faiss(X, Y):
-    import faiss
-    import numpy as np
-    X = np.ascontiguousarray(X.cpu().numpy(), dtype='float32')
-    Y = np.ascontiguousarray(Y.cpu().numpy(), dtype='float32')
-
-    index_flat = faiss.IndexFlatL2(Y.shape[-1])
-
-    # index_flat = faiss.index_cpu_to_gpu(faiss.StandardGpuResources(), 0, index_flat)
-    index_flat = faiss.index_cpu_to_all_gpus(index_flat)
-
-    index_flat.add(Y)  # add vectors to the index
-
-    _, I = index_flat.search(X, 1)  # actual search
-    NNs = I[:, 0]
-
-    return NNs
-
 
 def get_col_mins_efficient(X, Y, b):
     """
@@ -113,3 +118,25 @@ def get_col_mins_efficient(X, Y, b):
     return mins
 
 
+if __name__ == '__main__':
+    import torch
+    from time import time
+    X = torch.randn((100000, 147)).cuda()
+    Y = torch.randn((100000, 147)).cuda()
+
+    n = 10
+
+    start = time()
+    for i in range(n):
+        NNs = get_NN_indices(X, Y, alpha=1, b=128)
+    print(f"Time: {(time() - start) / n}")
+
+    start = time()
+    for i in range(n):
+        NNs = get_NN_indices_low_memory(X, Y, alpha=1, b=128)
+    print(f"Time: {(time() - start) / n}")
+
+    start = time()
+    for i in range(n):
+        NNs = get_NN_indices_faiss(X, Y)
+    print(f"Time: {(time() - start) / n}")

@@ -5,13 +5,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from GPNN import PNN, GPNN
 from utils.image import save_image
 
-if __name__ == '__main__':
-    dataset_dir = 'images/SIGD16'
+def reshuffle(dataset_dir, out_dir, use_faiss, alpha):
     image_paths = [os.path.join(dataset_dir, x) for x in os.listdir(dataset_dir)]
     PNN_moduel = PNN(patch_size=7,
                      stride=1,
-                     alpha=0.005,
-                     reduce_memory_footprint=True)
+                     alpha=alpha,
+                     use_faiss=use_faiss)
     GPNN_module = GPNN(PNN_moduel,
                        scale_factor=(1, 1),
                        resize=0,
@@ -21,11 +20,16 @@ if __name__ == '__main__':
                        noise_sigma=0.75,
                        device="cuda:0")
 
-    out_dir = f"outputs/reshuffle"
     for im_path in image_paths:
-        fname, ext = os.path.splitext(os.path.basename(im_path))[:2]
         for i in range(5):
             start = time()
             output_image = GPNN_module.run(target_img_path=im_path, init_mode="target")
             print(f"took {time() - start} s")
-            save_image(output_image, os.path.join(out_dir, f"{fname}${i}{ext}"))
+            save_image(output_image, os.path.join(out_dir, f"{i}/{os.path.basename(im_path)}"))
+
+
+if __name__ == '__main__':
+    dataset_name = "Places50"
+    # reshuffle(f'/home/ariel/university/GPDM/images/{dataset_name}', out_dir=f"outputs/reshuffle/{dataset_name}_target_faissIvf-50", use_faiss=True, alpha=1)
+    reshuffle(f'/home/ariel/university/GPDM/images/{dataset_name}', out_dir=f"outputs/reshuffle/{dataset_name}_target_alpha=1", use_faiss=False, alpha=1)
+    reshuffle(f'/home/ariel/university/GPDM/images/{dataset_name}', out_dir=f"outputs/reshuffle/{dataset_name}_target_alpha=0.005", use_faiss=False, alpha=0.005)
