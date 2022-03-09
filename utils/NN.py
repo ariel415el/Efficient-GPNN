@@ -3,18 +3,20 @@ import numpy as np
 import torch
 
 
-def get_NN_indices_faiss(X, Y):
+def get_NN_indices_faiss(X, Y, on_gpu=False):
     X = np.ascontiguousarray(X.cpu().numpy(), dtype='float32')
     Y = np.ascontiguousarray(Y.cpu().numpy(), dtype='float32')
     dim = Y.shape[-1]
 
-    index = faiss.IndexIVFFlat(faiss.IndexFlat(dim), dim, 50)
+    index = faiss.IndexIVFFlat(faiss.IndexFlat(dim), dim, int(np.sqrt(len(X))))
     index.nprobe = 1
     index.train(Y)
 
-    # index = faiss.index_cpu_to_all_gpus(index)
-    # index = faiss.index_cpu_to_gpu(faiss.StandardGpuResources(), 0, index)
-    # index.add(Y)  # add vectors to the index
+    if on_gpu:
+        # index = faiss.index_cpu_to_all_gpus(index)
+        index = faiss.index_cpu_to_gpu(faiss.StandardGpuResources(), 0, index)
+
+    index.add(Y)  # add vectors to the index
 
     _, I = index.search(X, 1)  # actual search
     NNs = I[:, 0]
@@ -78,7 +80,7 @@ def compute_distances_batch(X, Y, b):
     return dist_mat
 
 
-def get_NN_indices_low_memory(X, Y, alpha, b=512):
+def get_NN_indices_low_memory(X, Y, alpha, b=256):
     """
     Get the nearest neighbor index from Y for each X.
     Avoids holding a (n1 * n2) amtrix in order to reducing memory footprint to (b * max(n1,n2)).

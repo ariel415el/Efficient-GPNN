@@ -16,13 +16,17 @@ from utils.image import aspect_ratio_resize, get_pyramid, cv2pt, match_image_siz
 
 class logger:
     """Keeps track of the levels and steps of optimization. Logs it via TQDM"""
-    def __init__(self, n_steps, n_lvls):
+    def __init__(self, n_steps, n_lvls, single_iteration_in_first_pyr_level):
         self.n_steps = n_steps
         self.n_lvls = n_lvls
         self.lvl = -1
         self.lvl_step = 0
         self.steps = 0
-        self.pbar = tqdm(total=self.n_lvls * self.n_steps, desc='Starting')
+        if single_iteration_in_first_pyr_level:
+            total_steps= 1 + (self.n_lvls -1) * self.n_steps
+        else:
+            total_steps= (self.n_lvls) * self.n_steps
+        self.pbar = tqdm(total=total_steps, desc='Starting')
 
     def step(self):
         self.pbar.update(1)
@@ -35,7 +39,7 @@ class logger:
 
     def print(self):
         # pass
-        self.pbar.set_description(f'Lvl {self.lvl}/{self.n_lvls}, step {self.lvl_step}/{self.n_steps}')
+        self.pbar.set_description(f'Lvl {self.lvl}/{self.n_lvls-1}, step {self.lvl_step}/{self.n_steps}')
 
     def close(self):
         self.pbar.close()
@@ -84,7 +88,7 @@ class PNN:
                 NNs = get_NN_indices_faiss(queries, keys)
 
             elif self.reduce_memory_footprint:
-                NNs = get_NN_indices_low_memory(queries, keys, self.alpha, b=self.batch_size)
+                NNs = get_NN_indices_low_memory(queries.cuda(), keys.cuda(), self.alpha, b=self.batch_size).cpu()
             else:
                 NNs = get_NN_indices(queries, keys, self.alpha, b=self.batch_size)
 
@@ -105,6 +109,7 @@ class GPNN:
                     pyr_factor: float = 0.7,
                     coarse_dim: int = 32,
                     noise_sigma: float = 0.75,
+                    single_iteration_in_first_pyr_level=True,
                     device: str = 'cuda:0',
     ):
         """
@@ -124,6 +129,7 @@ class GPNN:
         self.pyr_factor = pyr_factor
         self.coarse_dim = coarse_dim
         self.noise_sigma = noise_sigma
+        self.single_iteration_in_first_pyr_level = single_iteration_in_first_pyr_level
         self.device = torch.device(device)
 
         self.name = f'R-{resize}_S-{pyr_factor}->{coarse_dim}+I(0,{noise_sigma})'
@@ -133,7 +139,7 @@ class GPNN:
         if self.resize:
             np_img = aspect_ratio_resize(np_img, max_dim=self.resize)
         pt_img = cv2pt(np_img)
-        pt_pyramid = get_pyramid(pt_img, self.coarse_dim, self.pyr_factor, self.device)
+        pt_pyramid = get_pyramid(pt_img, self.coarse_dim, self.pyr_factor, torch.device("cpu"))
         return pt_pyramid
 
     def _get_synthesis_size(self, lvl):
@@ -159,18 +165,18 @@ class GPNN:
             # Read an image as the input and match its size to the
             initial_iamge = cv2pt(cv2.imread(init_mode)).unsqueeze(0)
             initial_iamge = match_image_sizes(initial_iamge, target_img)
-            initial_iamge = transforms.Resize((h, w), antialias=True)(initial_iamge).to(self.device)
+            initial_iamge = transforms.Resize((h, w), antialias=True)(initial_iamge)
         elif init_mode == 'target':
             initial_iamge = transforms.Resize((h, w), antialias=True)(target_img)
         else:
-            initial_iamge = torch.zeros(1, 3, h, w).to(self.device)
+            initial_iamge = torch.zeros(1, 3, h, w)
 
         initial_iamge = initial_iamge
 
         if self.noise_sigma > 0:
-            initial_iamge += torch.normal(0, self.noise_sigma, size=(h, w)).reshape(1, 1, h, w).to(self.device)
+            initial_iamge += torch.normal(0, self.noise_sigma, size=(h, w)).reshape(1, 1, h, w)
 
-        return initial_iamge.to(self.device)
+        return initial_iamge
 
     def run(self, target_img_path, init_mode, debug_dir=None):
         """
@@ -181,7 +187,7 @@ class GPNN:
         """
         self.target_pyramid = self._process_target_image(cv2.imread(target_img_path))
         self.synthesized_image = self._get_initial_image(init_mode)
-        self.logger = logger(self.num_steps, len(self.target_pyramid))
+        self.logger = logger(self.num_steps, len(self.target_pyramid), self.single_iteration_in_first_pyr_level)
 
         for lvl, lvl_target_img in enumerate(self.target_pyramid):
             self.logger.new_lvl()
@@ -189,11 +195,10 @@ class GPNN:
                 h, w = self._get_synthesis_size(lvl=lvl)
                 self.synthesized_image = transforms.Resize((h, w), antialias=True)(self.synthesized_image)
 
-
             lvl_output = self.PNN_module.replace_patches(values_image=self.target_pyramid[lvl],
                                                          queries_image=self.synthesized_image,
-                                                         n_steps=self.num_steps if lvl > 0 else 1,
-                                                         keys_blur_factor=self.pyr_factor if lvl > 0 else 1,
+                                                         n_steps=1 if (self.single_iteration_in_first_pyr_level and lvl == 0) else self.num_steps,
+                                                         keys_blur_factor=1 if (self.single_iteration_in_first_pyr_level and lvl == 0) else self.pyr_factor,
                                                          logger=self.logger)
             if debug_dir:
                 save_image(self.synthesized_image, f"{debug_dir}/input{lvl}.png")

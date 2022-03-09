@@ -39,7 +39,6 @@ def downscale(img, pyr_factor):
 
 def blur(img, pyr_factor):
     """Blur image by downscaling and then upscaling it back to original size"""
-    assert pyr_factor <= 1
     if pyr_factor < 1:
         d_img = downscale(img, pyr_factor)
         img = transforms.Resize(img.shape[-2:], antialias=True)(d_img)
