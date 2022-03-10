@@ -33,7 +33,7 @@ def aspect_ratio_resize(img, max_dim=256):
         if (h / max_dim) > 1:
             blur_size = int((h / max_dim) * (3 / 2))
             img = cv2.blur(img, ksize=(blur_size, blur_size))
-            return cv2.resize(img, (int(w/h*max_dim), max_dim))
+        return cv2.resize(img, (int(w/h*max_dim), max_dim))
 
 
 
