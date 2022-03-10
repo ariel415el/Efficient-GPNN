@@ -22,11 +22,19 @@ def cv2pt(img):
 
 
 def aspect_ratio_resize(img, max_dim=256):
-    y, x, c = img.shape
-    if x > y:
-        return cv2.resize(img, (max_dim, int(y/x*max_dim)))
+    h, w, c = img.shape
+
+    if w > h:
+        if (w / max_dim) > 1:
+            blur_size = int((h / max_dim) * (3 / 2))
+            img = cv2.blur(img, ksize=(blur_size, blur_size))
+        return cv2.resize(img, (max_dim, int(h/w*max_dim)))
     else:
-        return cv2.resize(img, (int(x/y*max_dim), max_dim))
+        if (h / max_dim) > 1:
+            blur_size = int((h / max_dim) * (3 / 2))
+            img = cv2.blur(img, ksize=(blur_size, blur_size))
+            return cv2.resize(img, (int(w/h*max_dim), max_dim))
+
 
 
 def downscale(img, pyr_factor):
