@@ -2,6 +2,7 @@ import sys
 import os
 from typing import Tuple
 import cv2
+import numpy as np
 import torch
 from torchvision import transforms
 from tqdm import tqdm
@@ -10,6 +11,7 @@ from utils.image import save_image
 
 sys.path.append('.')
 from utils.image import aspect_ratio_resize, get_pyramid, cv2pt, match_image_sizes, blur, extract_patches,  combine_patches
+
 
 class logger:
     """Keeps track of the levels and steps of optimization. Logs it via TQDM"""
@@ -41,54 +43,13 @@ class logger:
     def close(self):
         self.pbar.close()
 
-class PNN:
-    """Patch nearest neighbor module. Replaces the patches of an initial guess by their nearest neighbor from a target image"""
-    def __init__(self,
-                 NN_module,
-                 patch_size: int = 7,
-                 stride: int = 1,
-                 ):
-        """
-        :param patch_size: size of the patches to be replaced
-        :param stride: stride in which the patches are extarcted
-        :apram NN_module: A module able to coumpute nearest neighbors between sets fo vectors
-
-        """
-        self.NN_module = NN_module
-        self.patch_size = patch_size
-        self.stride = stride
-
-    def replace_patches(self, values_image, queries_image, n_steps, keys_blur_factor=1, logger=None):
-        """
-        Repeats n_steps iterations of repalcing the patches in "queries_image" by thier nearest neighbors from "values_image".
-        The NN matrix is calculated with "keys" wich are a possibly blurred version of the patches from "values_image"
-        :param values_image: The target patches to extract possible pathces or replacement
-        :param queries_image: The synthesized image who's patches are to be replaced
-        :param n_steps: number of repeated replacements for each patch
-        :param keys_blur_factor: the factor with which to blur the values to get keys (image is downscaled and then upscaled with this factor)
-        """
-        keys_image = blur(values_image, keys_blur_factor)
-        keys = extract_patches(keys_image, self.patch_size, self.stride)
-
-        self.NN_module.init_index(keys.cuda())
-
-        values = extract_patches(values_image, self.patch_size, self.stride)
-        for i in range(n_steps):
-            queries = extract_patches(queries_image, self.patch_size, self.stride)
-
-            NNs = self.NN_module.search(queries.cuda()).cpu()
-
-            queries_image = combine_patches(values[NNs], self.patch_size, self.stride, queries_image.shape)
-            if logger:
-                logger.step()
-                logger.print()
-
-        return queries_image
 
 class GPNN:
     """An image generation model that runs a PNN module in a multi-scale setting as described in the paper "Drop-The-Gan"""
     def __init__(self,
-                    PNN_module: PNN,
+                    NN_module,
+                    patch_size: int = 7,
+                    stride: int = 1,
                     scale_factor: Tuple[float, float] = (1., 1.),
                     resize: int = None,
                     num_steps: int = 10,
@@ -96,19 +57,21 @@ class GPNN:
                     coarse_dim: int = 32,
                     noise_sigma: float = 0.75,
                     single_iteration_in_first_pyr_level=True,
-                    device: str = 'cuda:0',
     ):
         """
-        :param PNN_module:
+        :param NN_module: The method for computing nearest neighbors
+        :param patch_size: size of the patches to be replaced
+        :param stride: stride in which the patches are extarcted
         :param scale_factor: scale of the output in relation to input
         :param resize: max size of input image dimensions
         :param num_steps: number of PNN steps in each level
         :param pyr_factor: Downscale ratio of each pyramid level
         :param coarse_dim: minimal height for pyramid level
         :param noise_sigma: standard deviation of the zero mean normal noise added to the initialization
-        :param device: cuda/cpu
         """
-        self.PNN_module = PNN_module
+        self.NN_module = NN_module
+        self.patch_size = patch_size
+        self.stride = stride
         self.scale_factor = scale_factor
         self.resize = resize
         self.num_steps = num_steps
@@ -117,7 +80,7 @@ class GPNN:
         self.noise_sigma = noise_sigma
         self.single_iteration_in_first_pyr_level = single_iteration_in_first_pyr_level
 
-        self.name = f'R-{resize}_S-{pyr_factor}->{coarse_dim}+I(0,{noise_sigma})'
+        self.name = f'NN-{self.NN_module}_R-{resize}_S-{pyr_factor}->{coarse_dim}+I(0,{noise_sigma})'
 
     def _process_target_image(self, np_img):
         """Create a pyraimd of pytorch tensors from a np image. Ordered in increasing image size"""
@@ -163,6 +126,33 @@ class GPNN:
 
         return initial_iamge
 
+    def replace_patches(self, values_image, queries_image, n_steps, keys_blur_factor=1, logger=None):
+        """
+        Repeats n_steps iterations of repalcing the patches in "queries_image" by thier nearest neighbors from "values_image".
+        The NN matrix is calculated with "keys" wich are a possibly blurred version of the patches from "values_image"
+        :param values_image: The target patches to extract possible pathces or replacement
+        :param queries_image: The synthesized image who's patches are to be replaced
+        :param n_steps: number of repeated replacements for each patch
+        :param keys_blur_factor: the factor with which to blur the values to get keys (image is downscaled and then upscaled with this factor)
+        """
+        keys_image = blur(values_image, keys_blur_factor)
+        keys = extract_patches(keys_image, self.patch_size, self.stride)
+
+        self.NN_module.init_index(keys)
+
+        values = extract_patches(values_image, self.patch_size, self.stride)
+        for i in range(n_steps):
+            queries = extract_patches(queries_image, self.patch_size, self.stride)
+
+            NNs = self.NN_module.search(queries)
+
+            queries_image = combine_patches(values[NNs], self.patch_size, self.stride, queries_image.shape)
+            if logger:
+                logger.step()
+                logger.print()
+
+        return queries_image
+
     def run(self, target_img_path, init_mode, debug_dir=None):
         """
         Run the GPNN model to generate an image with a similar patch distribution to target_img_path.
@@ -180,7 +170,7 @@ class GPNN:
                 h, w = self._get_synthesis_size(lvl=lvl)
                 self.synthesized_image = transforms.Resize((h, w), antialias=True)(self.synthesized_image)
 
-            lvl_output = self.PNN_module.replace_patches(values_image=self.target_pyramid[lvl],
+            lvl_output = self.replace_patches(values_image=self.target_pyramid[lvl],
                                                          queries_image=self.synthesized_image,
                                                          n_steps=1 if (self.single_iteration_in_first_pyr_level and lvl == 0) else self.num_steps,
                                                          keys_blur_factor=1 if (self.single_iteration_in_first_pyr_level and lvl == 0) else self.pyr_factor,

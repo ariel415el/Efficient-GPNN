@@ -2,37 +2,37 @@ import faiss
 import numpy as np
 import torch
 
-# def get_NN_indices(X, Y, alpha, b=128):
-#     """
-#     Get the nearest neighbor index from Y for each X. Use batches to save memory
-#     :param X:  (n1, d) tensor
-#     :param Y:  (n2, d) tensor
-#     Returns a n2 n1 of indices
-#     """
-#     dist = compute_distances_batch(X, Y, b=b)
-#     # dist = torch.cdist(X.view(len(X), -1), Y.view(len(Y), -1)) # Not enough memory
-#     dist = (dist / (torch.min(dist, dim=0)[0] + alpha)) # compute_normalized_scores
-#     NNs = torch.argmin(dist, dim=1)  # find_NNs
-#     return NNs
-#
-# def compute_distances_batch(X, Y, b):
-#     """
-#     Computes distance matrix in batches of rows to reduce memory consumption from (n1 * n2 * d) to (d * n2 * d)
-#     :param X:  (n1, d) tensor
-#     :param Y:  (n2, d) tensor
-#     :param b: rows batch size
-#     Returns a (n2, n1) matrix of L2 distances
-#     """
-#     """"""
-#     b = min(b, len(X))
-#     dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
-#     n_batches = len(X) // b
-#     for i in range(n_batches):
-#         dist_mat[i * b:(i + 1) * b] = efficient_compute_distances(X[i * b:(i + 1) * b], Y)
-#     if len(X) % b != 0:
-#         dist_mat[n_batches * b:] = efficient_compute_distances(X[n_batches * b:], Y)
-#
-#     return dist_mat
+def get_NN_indices(X, Y, alpha, b=128):
+    """
+    Get the nearest neighbor index from Y for each X. Use batches to save memory
+    :param X:  (n1, d) tensor
+    :param Y:  (n2, d) tensor
+    Returns a n2 n1 of indices
+    """
+    dist = compute_distances_batch(X, Y, b=b)
+    # dist = torch.cdist(X.view(len(X), -1), Y.view(len(Y), -1)) # Not enough memory
+    dist = (dist / (torch.min(dist, dim=0)[0] + alpha)) # compute_normalized_scores
+    NNs = torch.argmin(dist, dim=1)  # find_NNs
+    return NNs
+
+def compute_distances_batch(X, Y, b):
+    """
+    Computes distance matrix in batches of rows to reduce memory consumption from (n1 * n2 * d) to (d * n2 * d)
+    :param X:  (n1, d) tensor
+    :param Y:  (n2, d) tensor
+    :param b: rows batch size
+    Returns a (n2, n1) matrix of L2 distances
+    """
+    """"""
+    b = min(b, len(X))
+    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
+    n_batches = len(X) // b
+    for i in range(n_batches):
+        dist_mat[i * b:(i + 1) * b] = efficient_compute_distances(X[i * b:(i + 1) * b], Y)
+    if len(X) % b != 0:
+        dist_mat[n_batches * b:] = efficient_compute_distances(X[n_batches * b:], Y)
+
+    return dist_mat
 
 def efficient_compute_distances(X, Y):
     """

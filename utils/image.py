@@ -11,7 +11,6 @@ def save_image(img, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     torchvision.utils.save_image(torch.clip(img, -1, 1), path, normalize=True)
 
-
 def cv2pt(img):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = img / 255.
@@ -20,28 +19,25 @@ def cv2pt(img):
 
     return img
 
-
 def aspect_ratio_resize(img, max_dim=256):
     h, w, c = img.shape
+    if max(h, w) / max_dim > 1:
+        img = cv2.blur(img, ksize=(5, 5))
 
     if w > h:
-        if (w / max_dim) > 1:
-            blur_size = int((h / max_dim) * (3 / 2))
-            img = cv2.blur(img, ksize=(blur_size, blur_size))
-        return cv2.resize(img, (max_dim, int(h/w*max_dim)))
+        h = int(h/w*max_dim)
+        w = max_dim
     else:
-        if (h / max_dim) > 1:
-            blur_size = int((h / max_dim) * (3 / 2))
-            img = cv2.blur(img, ksize=(blur_size, blur_size))
-        return cv2.resize(img, (int(w/h*max_dim), max_dim))
+        w = int(w/h*max_dim)
+        h = max_dim
 
+    return cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
 
 
 def downscale(img, pyr_factor):
     assert 0 < pyr_factor < 1
     new_w = int(pyr_factor * img.shape[-1])
     new_h = int(pyr_factor * img.shape[-2])
-
     return transforms.Resize((new_h, new_w), antialias=True)(img)
 
 
@@ -102,6 +98,7 @@ def extract_patches(src_img, patch_size, stride):
     patches = F.unfold(src_img, kernel_size=patch_size, dilation=(1, 1), stride=stride, padding=(0, 0)) # shape (b, 3*p*p, N_patches)
     patches = patches.squeeze(dim=0).permute((1, 0)).reshape(-1, channels * patch_size**2)
     return patches
+
 
 def combine_patches(patches, patch_size, stride, img_shape):
     """

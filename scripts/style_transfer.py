@@ -4,17 +4,26 @@ import sys
 
 import torch
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from GPNN import PNN, GPNN
-from utils.image import save_image
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.NN_modules import *
+from GPNN import GPNN
+from utils.image import save_image
 
 
 def style_transfer(contents_and_styles):
     with torch.no_grad():
-        PNN_moduel = PNN(patch_size=11, stride=1, alpha=0.005, reduce_memory_footprint=True, use_faiss=False, batch_size=256)
-        GPNN_module = GPNN(PNN_moduel, scale_factor=(1, 1), resize=256, num_steps=10, pyr_factor=0.5, coarse_dim=128,
-                           noise_sigma=0, device="cuda:0")
+
+        # NN_module = PytorchNNLowMemory(alpha=0.005, batch_size=256, use_gpu=True); resize=256; coarse_dim=128
+        NN_module = FaissIVFPQ(use_gpu=True); resize=1024; coarse_dim=1024
+
+        GPNN_module = GPNN(NN_module, patch_size=8,
+                                      resize=resize,
+                                      coarse_dim=coarse_dim,
+                                      num_steps=100,
+                                      pyr_factor=0.75,
+                                      noise_sigma=0,
+                                      single_iteration_in_first_pyr_level=False)
 
         out_dir = f"outputs/style_transfer"
         for (content_image_path, style_iamge_path) in contents_and_styles:
@@ -24,7 +33,7 @@ def style_transfer(contents_and_styles):
 
             content_fname, ext = os.path.splitext(os.path.basename(content_image_path))[:2]
             style_fname = os.path.basename(style_iamge_path)
-            output_path = os.path.join(out_dir, f'{GPNN_module.resize}x{GPNN_module.pyr_factor}->{GPNN_module.coarse_dim}', f"{content_fname}-to-{style_fname}")
+            output_path = os.path.join(out_dir, f'{GPNN_module.NN_module}_{GPNN_module.resize}x{GPNN_module.pyr_factor}->{GPNN_module.coarse_dim}', f"{content_fname}-to-{style_fname}")
             save_image(output_image, output_path)
 
 
