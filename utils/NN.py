@@ -2,49 +2,37 @@ import faiss
 import numpy as np
 import torch
 
-
-def get_NN_indices_faiss(X, Y, on_gpu=False):
-    X = np.ascontiguousarray(X.cpu().numpy(), dtype='float32')
-    Y = np.ascontiguousarray(Y.cpu().numpy(), dtype='float32')
-    dim = Y.shape[-1]
-
-    index = faiss.IndexIVFFlat(faiss.IndexFlat(dim), dim, int(np.sqrt(len(X))))
-    index.nprobe = 1
-    index.train(Y)
-
-    if on_gpu:
-        # index = faiss.index_cpu_to_all_gpus(index)
-        index = faiss.index_cpu_to_gpu(faiss.StandardGpuResources(), 0, index)
-
-    index.add(Y)  # add vectors to the index
-
-    _, I = index.search(X, 1)  # actual search
-    NNs = I[:, 0]
-
-    return NNs
-
-
-def get_NN_indices(X, Y, alpha, b=128):
-    """
-    Get the nearest neighbor index from Y for each X
-    :param X:  (n1, d) tensor
-    :param Y:  (n2, d) tensor
-    Returns a n2 n1 of indices
-    """
-    dist = compute_distances_batch(X, Y, b=b)
-    # dist = compute_distances(X, Y)
-    # dist = torch.cdist(X.view(len(X), -1), Y.view(len(Y), -1)) # Not enough memory
-    dist = (dist / (torch.min(dist, dim=0)[0] + alpha)) # compute_normalized_scores
-    NNs = torch.argmin(dist, dim=1)  # find_NNs
-    return NNs
-
-
-def compute_distances(X, Y):
-    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
-    for i in range(len(X)):
-        dist_mat[i] = torch.mean((X[i] - Y) ** 2, dim=-1)
-    return dist_mat
-
+# def get_NN_indices(X, Y, alpha, b=128):
+#     """
+#     Get the nearest neighbor index from Y for each X. Use batches to save memory
+#     :param X:  (n1, d) tensor
+#     :param Y:  (n2, d) tensor
+#     Returns a n2 n1 of indices
+#     """
+#     dist = compute_distances_batch(X, Y, b=b)
+#     # dist = torch.cdist(X.view(len(X), -1), Y.view(len(Y), -1)) # Not enough memory
+#     dist = (dist / (torch.min(dist, dim=0)[0] + alpha)) # compute_normalized_scores
+#     NNs = torch.argmin(dist, dim=1)  # find_NNs
+#     return NNs
+#
+# def compute_distances_batch(X, Y, b):
+#     """
+#     Computes distance matrix in batches of rows to reduce memory consumption from (n1 * n2 * d) to (d * n2 * d)
+#     :param X:  (n1, d) tensor
+#     :param Y:  (n2, d) tensor
+#     :param b: rows batch size
+#     Returns a (n2, n1) matrix of L2 distances
+#     """
+#     """"""
+#     b = min(b, len(X))
+#     dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
+#     n_batches = len(X) // b
+#     for i in range(n_batches):
+#         dist_mat[i * b:(i + 1) * b] = efficient_compute_distances(X[i * b:(i + 1) * b], Y)
+#     if len(X) % b != 0:
+#         dist_mat[n_batches * b:] = efficient_compute_distances(X[n_batches * b:], Y)
+#
+#     return dist_mat
 
 def efficient_compute_distances(X, Y):
     """
@@ -60,27 +48,7 @@ def efficient_compute_distances(X, Y):
     return dist
 
 
-def compute_distances_batch(X, Y, b):
-    """
-    Computes distance matrix in batches of rows to reduce memory consumption from (n1 * n2 * d) to (d * n2 * d)
-    :param X:  (n1, d) tensor
-    :param Y:  (n2, d) tensor
-    :param b: rows batch size
-    Returns a (n2, n1) matrix of L2 distances
-    """
-    """"""
-    b = min(b, len(X))
-    dist_mat = torch.zeros((X.shape[0], Y.shape[0]), dtype=torch.float16, device=X.device)
-    n_batches = len(X) // b
-    for i in range(n_batches):
-        dist_mat[i * b:(i + 1) * b] = efficient_compute_distances(X[i * b:(i + 1) * b], Y)
-    if len(X) % b != 0:
-        dist_mat[n_batches * b:] = efficient_compute_distances(X[n_batches * b:], Y)
-
-    return dist_mat
-
-
-def get_NN_indices_low_memory(X, Y, alpha, b=256):
+def get_NN_indices_low_memory(X, Y, alpha, b):
     """
     Get the nearest neighbor index from Y for each X.
     Avoids holding a (n1 * n2) amtrix in order to reducing memory footprint to (b * max(n1,n2)).
@@ -88,9 +56,11 @@ def get_NN_indices_low_memory(X, Y, alpha, b=256):
     :param Y:  (n2, d) tensor
     Returns a n2 n1 of indices
     """
-    # Computes the distance of each y to the closest x and add alpha to get the per column normalizing factor
-    normalizing_row = get_col_mins_efficient(X, Y, b=b)
-    normalizing_row = alpha + normalizing_row[None, :]
+    if alpha is not None:
+        normalizing_row = get_col_mins_efficient(X, Y, b=b)
+        normalizing_row = alpha + normalizing_row[None, :]
+    else:
+        normalizing_row = 1
 
     NNs = torch.zeros(X.shape[0], dtype=torch.long, device=X.device)
     n_batches = len(X) // b

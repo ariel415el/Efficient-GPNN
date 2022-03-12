@@ -8,11 +8,8 @@ from tqdm import tqdm
 
 from utils.image import save_image
 
-from utils.NN import get_NN_indices_low_memory, get_NN_indices, get_NN_indices_faiss
-
 sys.path.append('.')
-from utils.image import aspect_ratio_resize, get_pyramid, cv2pt, match_image_sizes, blur, extract_patches, \
-    combine_patches
+from utils.image import aspect_ratio_resize, get_pyramid, cv2pt, match_image_sizes, blur, extract_patches,  combine_patches
 
 class logger:
     """Keeps track of the levels and steps of optimization. Logs it via TQDM"""
@@ -47,27 +44,19 @@ class logger:
 class PNN:
     """Patch nearest neighbor module. Replaces the patches of an initial guess by their nearest neighbor from a target image"""
     def __init__(self,
+                 NN_module,
                  patch_size: int = 7,
                  stride: int = 1,
-                 alpha: float = 0.005,
-                 reduce_memory_footprint: bool = True,
-                 use_faiss=False,
-                 batch_size: int = 512,
                  ):
         """
         :param patch_size: size of the patches to be replaced
         :param stride: stride in which the patches are extarcted
-        :param alpha: 'alpha parameter of the normalizing distance matrix. small alpha encourages completeness. default is 0.005 (float)'
-        :param reduce_memory_footprint:
-        :param batch_size: batch size for computing the NNs
+        :apram NN_module: A module able to coumpute nearest neighbors between sets fo vectors
 
         """
+        self.NN_module = NN_module
         self.patch_size = patch_size
         self.stride = stride
-        self.alpha = alpha
-        self.reduce_memory_footprint = reduce_memory_footprint
-        self.use_faiss = use_faiss
-        self.batch_size = batch_size
 
     def replace_patches(self, values_image, queries_image, n_steps, keys_blur_factor=1, logger=None):
         """
@@ -80,17 +69,14 @@ class PNN:
         """
         keys_image = blur(values_image, keys_blur_factor)
         keys = extract_patches(keys_image, self.patch_size, self.stride)
+
+        self.NN_module.init_index(keys.cuda())
+
         values = extract_patches(values_image, self.patch_size, self.stride)
         for i in range(n_steps):
             queries = extract_patches(queries_image, self.patch_size, self.stride)
 
-            if self.use_faiss:
-                NNs = get_NN_indices_faiss(queries, keys)
-
-            elif self.reduce_memory_footprint:
-                NNs = get_NN_indices_low_memory(queries.cuda(), keys.cuda(), self.alpha, b=self.batch_size).cpu()
-            else:
-                NNs = get_NN_indices(queries, keys, self.alpha, b=self.batch_size)
+            NNs = self.NN_module.search(queries.cuda()).cpu()
 
             queries_image = combine_patches(values[NNs], self.patch_size, self.stride, queries_image.shape)
             if logger:
@@ -130,7 +116,6 @@ class GPNN:
         self.coarse_dim = coarse_dim
         self.noise_sigma = noise_sigma
         self.single_iteration_in_first_pyr_level = single_iteration_in_first_pyr_level
-        self.device = torch.device(device)
 
         self.name = f'R-{resize}_S-{pyr_factor}->{coarse_dim}+I(0,{noise_sigma})'
 
@@ -139,7 +124,7 @@ class GPNN:
         if self.resize:
             np_img = aspect_ratio_resize(np_img, max_dim=self.resize)
         pt_img = cv2pt(np_img)
-        pt_pyramid = get_pyramid(pt_img, self.coarse_dim, self.pyr_factor, torch.device("cpu"))
+        pt_pyramid = get_pyramid(pt_img, self.coarse_dim, self.pyr_factor)
         return pt_pyramid
 
     def _get_synthesis_size(self, lvl):

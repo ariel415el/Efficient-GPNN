@@ -53,7 +53,7 @@ def blur(img, pyr_factor):
     return img
 
 
-def get_pyramid(img, min_height, pyr_factor, device):
+def get_pyramid(img, min_height, pyr_factor):
     res = [img]
     while True:
         img = downscale(img, pyr_factor)
@@ -66,7 +66,7 @@ def get_pyramid(img, min_height, pyr_factor, device):
         new_width = int(min_height * res[0].shape[-1] / float(res[0].shape[-2]))
         res[0] = transforms.Resize((min_height, new_width), antialias=True)(res[0])
 
-    res = [x.unsqueeze(0).to(device) for x in res]
+    res = [x.unsqueeze(0) for x in res]
     return res
 
 
