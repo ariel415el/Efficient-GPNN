@@ -81,10 +81,10 @@ def get_col_mins_efficient(X, Y, b):
     Returns n1 long array of L2 distances
     """
     mins = torch.zeros(Y.shape[0], dtype=X.dtype, device=X.device)
-    n_batches = len(X) // b
+    n_batches = len(Y) // b
     for i in range(n_batches):
         mins[i * b:(i + 1) * b] = efficient_compute_distances(X, Y[i * b:(i + 1) * b]).min(0)[0]
-    if len(X) % b != 0:
+    if len(Y) % b != 0:
         mins[n_batches * b:] = efficient_compute_distances(X, Y[n_batches * b:]).min(0)[0]
 
     return mins
