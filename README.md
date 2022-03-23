@@ -1,10 +1,14 @@
 # Efficient-GPNN
 An efficient Pytorch implementation of GPNN as depicted in ["Drop the GAN: In Defense of Patches Nearest Neighbors as Single Image Generative Models"](https://arxiv.org/abs/2103.15545)
 
-This is the version of GPNN I used to compare with my model in the reaserach done for writing the paper "Generating natural images with direct patch distributions matching [CVPR 2022]". The code for my paper is here https://github.com/ariel415el/GPDM.
+This is the version of GPNN I used to compare with my model in the reaserach done for writing the paper "Generating natural images with direct patch distributions matching". The code for my paper is here https://github.com/ariel415el/GPDM.
 
 While writing this implementation I consulted the implementaion in https://github.com/iyttor/GPNN.git.
-My implementation offers more simplicity, a faster pytorch computiion of the NN matrix and and a low memory version of the computation done in O(N+M) as suggested in the suplementary of the paper: https://www.wisdom.weizmann.ac.il/~vision/gpnn/
+My implementation offers more simplicity, a faster pytorch computiion of the NN matrix and and a low memory version of the computation done in O(N+M) as 
+suggested in the suplementary of the paper: https://www.wisdom.weizmann.ac.il/~vision/gpnn/.
+
+I've also implemented aproximated NN with Faiss (cpu/gpu) with various indices like IVF and IVFPQ.
+
 
 # NN computation options
 - Pytorch : Batched Fast pytorch nn computations
@@ -19,7 +23,7 @@ My implementation offers more simplicity, a faster pytorch computiion of the NN 
 - FaissIVF: uses faiss inverted index approximate-nn (Cpu and GPU, no alpha)
 
   `NN_module = FaissIVF(use_gpu=True)`
-  - FaissIVFPQ: uses faiss inverted index with product quantization approximate-nn (Cpu and GPU, no alpha)
+- FaissIVFPQ: uses faiss inverted index with product quantization approximate-nn (Cpu and GPU, no alpha)
   
   `NN_module = FaissIVFPQ(use_gpu=True)`
 
