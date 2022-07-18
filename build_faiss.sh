@@ -1,3 +1,5 @@
+# In cases where pip isntall fais-gpu does not work or gpu is  not used you can build Faiss from source using the following commands
+
 export CUDA_HOME=/usr/local/cuda-11.6
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.6/lib64:/usr/local/cuda-11.6/extras/CUPTI/lib64
 export PATH=$PATH:$CUDA_HOME/bin

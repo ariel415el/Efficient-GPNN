@@ -1,4 +1,3 @@
-import faiss
 import numpy as np
 import torch
 
@@ -90,25 +89,3 @@ def get_col_mins_efficient(X, Y, b):
     return mins
 
 
-if __name__ == '__main__':
-    import torch
-    from time import time
-    X = torch.randn((100000, 147)).cuda()
-    Y = torch.randn((100000, 147)).cuda()
-
-    n = 10
-
-    start = time()
-    for i in range(n):
-        NNs = get_NN_indices(X, Y, alpha=1, b=128)
-    print(f"Time: {(time() - start) / n}")
-
-    start = time()
-    for i in range(n):
-        NNs = get_NN_indices_low_memory(X, Y, alpha=1, b=128)
-    print(f"Time: {(time() - start) / n}")
-
-    start = time()
-    for i in range(n):
-        NNs = get_NN_indices_faiss(X, Y)
-    print(f"Time: {(time() - start) / n}")
