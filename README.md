@@ -56,3 +56,15 @@ I've also implemented approximated NN with Faiss (cpu/gpu) with various indices 
 | Input                                                        | init_from                                                 | Output                                                     |
 |--------------------------------------------------------------|-----------------------------------------------------------|------------------------------------------------------------| 
 | <img src="images/style_transfer/mondrian.jpg" height="200"/> | <img src="images/style_transfer/trump.jpg" height="200"/> | <img src="Readme_images/style_transfer.png" height="200"/> |  
+
+# Cites
+```
+@inproceedings{granot2022drop,
+  title={Drop the gan: In defense of patches nearest neighbors as single image generative models},
+  author={Granot, Niv and Feinstein, Ben and Shocher, Assaf and Bagon, Shai and Irani, Michal},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={13460--13469},
+  year={2022}
+}
+```
+
