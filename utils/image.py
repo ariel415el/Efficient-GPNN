@@ -63,7 +63,7 @@ def extract_patches(src_img, patch_size, stride):
     """
     Splits the image to overlapping patches and returns a pytorch tensor of size (N_patches, 3*patch_size**2)
     """
-    channels = 3
+    channels = src_img.shape[1]
     patches = F.unfold(src_img, kernel_size=patch_size, stride=stride) # shape (b, 3*p*p, N_patches)
     patches = patches.squeeze(dim=0).permute((1, 0)).reshape(-1, channels * patch_size**2)
     return patches

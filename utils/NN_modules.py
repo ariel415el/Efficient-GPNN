@@ -14,7 +14,7 @@ class FaissNNModule:
         raise NotImplemented
 
     def init_index(self, index_vectors):
-        self.index_vectors = np.ascontiguousarray(index_vectors.numpy(), dtype='float32')
+        self.index_vectors = np.ascontiguousarray(index_vectors.cpu().numpy(), dtype='float32')
         self.index = self._get_index(*self.index_vectors.shape)
 
         if self.use_gpu:
@@ -28,7 +28,7 @@ class FaissNNModule:
 
     def search(self, queries):
         assert self.index is not None
-        queries_np = np.ascontiguousarray(queries.numpy(), dtype='float32')
+        queries_np = np.ascontiguousarray(queries.cpu().numpy(), dtype='float32')
         _, I = self.index.search(queries_np, 1)  # actual search
 
         NNs = torch.from_numpy(I[:, 0])
